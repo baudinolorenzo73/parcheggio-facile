@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parcheggio Facile</title>
+  <meta name="theme-color" content="#2196f3">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; color: #333; }
+    .container { 
+      max-width: 400px; 
+      margin: 0 auto; 
+      background: white; 
+      padding: 30px 20px; 
+      border-radius: 16px; 
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      position: relative; /* Necessario per la X */
+    }
+    h1 { font-size: 1.8rem; margin-bottom: 10px; margin-top: 25px; }
+    button { display: block; width: 100%; padding: 18px; margin: 10px 0; font-size: 1.2rem; font-weight: bold; border: none; border-radius: 50px; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
+    button:active { transform: scale(0.97); }
+    #salva { background-color: #4CAF50; color: white; }
+    #apri { background-color: #2196F3; color: white; }
+    #naviga { background-color: #009688; color: white; }
+    #cancella { background-color: #f44336; color: white; font-size: 1rem; padding: 12px; }
+    #copia { background-color: #FF9800; color: white; font-size: 1rem; padding: 12px; }
+    #condividi { background-color: #9C27B0; color: white; font-size: 1rem; padding: 12px; }
+    
+    /* TASTINO X IN ALTO A DX */
+    #chiudiX {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      margin: 0;
+      border-radius: 50%;
+      background-color: #e0e0e0;
+      color: #333;
+      font-size: 1.4rem;
+      line-height: 36px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #chiudiX:active { background-color: #bdbdbd; }
+
+    .info { background: #e9ecef; padding: 15px; border-radius: 10px; margin: 20px 0; min-height: 50px; }
+    .info p { margin: 5px 0; font-size: 1rem; word-break: break-all; }
+    .status { color: #555; font-size: 0.9rem; margin-top: 10px; }
+    .flex-row { display: flex; gap: 10px; }
+    .flex-row button { flex: 1; padding: 14px; font-size: 1rem; }
+    [hidden] { display: none !important; }
+    button:disabled { opacity: .5; cursor: default; }
+    button:focus-visible { outline: 3px solid #333; outline-offset: 3px; }
+    .disabled-btn { opacity: 0.5; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <h1>🅿️ Parcheggio Facile</h1>
+    <button id="salva">📍 Salva posizione</button>
+    <button id="apri">🗺️ Apri in Maps</button>
+    <button id="naviga">🚶 Naviga a piedi</button>
+    <div class="flex-row">
+      <button id="copia">📋 Copia coordinate</button>
+      <button id="condividi">📤 Condividi</button>
+    </div>
+    <button id="cancella">🗑️ Cancella posizione</button>
+    <div class="info" id="info"><p>Nessuna posizione salvata</p></div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <p class="status" id="installInfo"></p>
+    <button id="installa" hidden>Installa app</button>
+  </div>
+<script>
+(function() {
+  'use strict';
+  const el = id => document.getElementById(id);
+  const status = text => { el('status').textContent = text; };
+  const KEY = 'posizioneParcheggio';
+  let pos = null, busy = false, storageError = '';
+  function valid(p) {
+    return p && typeof p === 'object' && Number.isFinite(p.lat) && Number.isFinite(p.lon)
+      && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180;
+  }
+  function read() {
+    storageError = '';
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw === null) { pos = null; return; }
+      const saved = JSON.parse(raw);
+      if (!valid(saved)) throw new Error('invalid');
+      pos = saved;
+    } catch (error) {
+      pos = null;
+      storageError = 'Dati salvati non leggibili o memoria non accessibile. Puoi riprovare a salvare la posizione.';
+    }
+  }
+  function render() {
+    el('info').replaceChildren();
+    const lines = pos ? ['Posizione salvata:', `Lat: ${pos.lat.toFixed(6)}`, `Lon: ${pos.lon.toFixed(6)}`] : ['Nessuna posizione salvata'];
+    if (pos && Number.isFinite(pos.accuracy) && pos.accuracy >= 0) lines.push(`Precisione GPS: circa ${Math.round(pos.accuracy)} m`);
+    if (pos && Number.isFinite(pos.savedAt) && Number.isFinite(new Date(pos.savedAt).getTime())) lines.push(new Date(pos.savedAt).toLocaleString('it-IT'));
+    for (const text of lines) { const p = document.createElement('p'); p.textContent = text; el('info').appendChild(p); }
+    for (const id of ['apri','naviga','copia','condividi','cancella']) el(id).disabled = !pos || busy;
+    el('salva').disabled = busy;
+  }
+  const maps = p => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
+  el('salva').addEventListener('click', () => {
+    if (busy) return;
+    if (!window.isSecureContext) { status('Per usare il GPS apri l’app da un indirizzo HTTPS.'); return; }
+    if (!navigator.geolocation) { status('Geolocalizzazione non disponibile in questo browser.'); return; }
+    busy = true; render(); status('Rilevamento posizione…');
+    const fail = error => {
+      busy = false; render();
+      status(({1:'Permesso GPS negato. Abilita la posizione nelle impostazioni del browser.',2:'Posizione non disponibile. Controlla il GPS e riprova all’aperto.',3:'Tempo scaduto. Riprova all’aperto.'})[error.code] || 'Impossibile rilevare la posizione.');
+    };
+    try { navigator.geolocation.getCurrentPosition(result => {
+      busy = false;
+      const next = {lat: result.coords.latitude, lon: result.coords.longitude, accuracy: result.coords.accuracy, savedAt: Date.now()};
+      if (!valid(next)) { render(); status('Il GPS ha restituito coordinate non valide.'); return; }
+      try {
+        localStorage.setItem(KEY, JSON.stringify(next)); pos = next; storageError = ''; render();
+        status(next.accuracy > 100 ? 'Posizione salvata, ma poco precisa: riprova all’aperto.' : 'Posizione salvata con successo!');
+      } catch { render(); status('Salvataggio non riuscito: memoria non disponibile. La posizione precedente non è stata sostituita.'); }
+    }, fail, {enableHighAccuracy:true, timeout:15000, maximumAge:0}); } catch (error) { fail(error); }
+  });
+  el('apri').addEventListener('click', () => { if (pos) window.location.assign(maps(pos)); });
+  el('naviga').addEventListener('click', () => { if (pos) window.location.assign(`https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lon}&travelmode=walking&dir_action=navigate`); });
+  async function copy(text) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } } catch {}
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly','');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '-9999px';
+    const previous = document.activeElement; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    try { return document.execCommand('copy') === true; } catch { return false; }
+    finally { ta.remove(); if (previous && previous.focus) previous.focus(); }
+  }
+  el('copia').addEventListener('click', async () => {
+    if (!pos) return;
+    status(await copy(`${pos.lat}, ${pos.lon}`) ? 'Coordinate copiate!' : 'Copia non riuscita. Le coordinate sono visibili sopra: puoi selezionarle manualmente.');
+  });
+  el('condividi').addEventListener('click', async () => {
+    if (!pos) return;
+    const url = maps(pos);
+    if (navigator.share) {
+      try { await navigator.share({title:'Posizione parcheggio',text:'Ho parcheggiato qui',url}); status('Condivisione completata.'); return; }
+      catch (error) { if (error.name === 'AbortError') { status('Condivisione annullata.'); return; } }
+    }
+    status(await copy(`Ho parcheggiato qui: ${url}`) ? 'Link copiato: puoi incollarlo in un messaggio.' : 'Condivisione e copia non disponibili. Puoi copiare manualmente le coordinate.');
+  });
+  el('cancella').addEventListener('click', () => {
+    if (!pos || busy || !window.confirm('Cancellare la posizione del parcheggio?')) return;
+    try { localStorage.removeItem(KEY); pos = null; render(); status('Posizione cancellata.'); }
+    catch { status('Cancellazione non riuscita: memoria non accessibile.'); }
+  });
+  window.addEventListener('storage', event => { if (event.key === KEY || event.key === null) { read(); render(); status(storageError || 'Posizione aggiornata.'); } });
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; el('installa').hidden = false; });
+  el('installa').addEventListener('click', async () => {
+    if (!installPrompt) return;
+    const prompt = installPrompt; installPrompt = null; el('installa').hidden = true;
+    try { await prompt.prompt(); const choice = await prompt.userChoice; el('installInfo').textContent = choice.outcome === 'accepted' ? 'Installazione richiesta.' : 'Installazione annullata.'; }
+    catch { el('installInfo').textContent = 'Apri il menu del browser e scegli Aggiungi alla schermata Home.'; }
+  });
+  window.addEventListener('appinstalled', () => { installPrompt = null; el('installa').hidden = true; el('installInfo').textContent = 'App installata.'; });
+  const web = ['https:','http:'].includes(location.protocol);
+  if (web && window.isSecureContext && 'serviceWorker' in navigator) {
+    el('installInfo').textContent = 'Per installare: menu del browser → Aggiungi alla schermata Home.';
+    navigator.serviceWorker.register('./sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+      el('installInfo').textContent = 'App pronta anche offline. Per installare: menu del browser → Aggiungi alla schermata Home. Le mappe richiedono una connessione.';
+    }).catch(() => { el('installInfo').textContent = 'Modalità offline non disponibile: verifica che tutti i file dell’app siano pubblicati.'; });
+  } else {
+    el('installInfo').textContent = 'File locale: per un’icona Home stabile e la modalità offline occorre pubblicare il pacchetto completo su HTTPS.';
+  }
+  read(); render(); status(storageError || (pos ? 'Posizione memorizzata.' : ''));
+})();
+</script>
+</body>
+</html>

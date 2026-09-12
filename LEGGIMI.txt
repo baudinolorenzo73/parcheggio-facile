@@ -1,0 +1,6 @@
+PARCHEGGIO FACILE — VERSIONE CORRETTA
+Apri parcheggio.html per visualizzare la pagina.
+Per installarla su Android, pubblica TUTTI i file di questa cartella nello stesso percorso su un sito HTTPS. Apri parcheggio.html in Chrome, poi menu > Aggiungi alla schermata Home / Installa app. Non basta scaricare l’HTML.
+Dopo il primo caricamento online completato, la pagina può riaprirsi offline; GPS dipende dal dispositivo, le mappe esterne dalla connessione o dalle mappe già scaricate nella relativa app.
+La posizione resta nel browser e nello stesso indirizzo del sito. Non viene caricata su un server dall’app. Aprire Maps o condividere invia la posizione al servizio scelto. Cambiando sito/browser o cancellando i dati del browser non si ritrova il parcheggio precedente: copia prima le coordinate.
+Correzioni: validazione dati, errori memoria, errori GPS, prevenzione richieste simultanee, precisione e data, pulsanti disabilitati correttamente, link universali Maps, copia e condivisione, conferma cancellazione, rimozione X che portava a pagina vuota, supporto zoom, manifest e cache offline.
