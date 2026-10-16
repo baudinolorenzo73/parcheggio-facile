@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parcheggio Rapido</title>
+  <meta name="theme-color" content="#2e7d32">
+  <meta name="color-scheme" content="light dark">
+  <link rel="manifest" href="manifest-rapido.webmanifest">
+  <link rel="apple-touch-icon" href="icon-rapido-192.png">
+  <style>
+    :root { color-scheme: light; --bg: #f0f4f8; --fg: #222; --muted: #555; --panel: #e3e8ed; --faint: #888; }
+    @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --bg: #0f1419; --fg: #e6e9ec; --muted: #a3afbb; --panel: #252f3a; --faint: #7d8996; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; min-height: 100dvh; font-family: Arial, sans-serif; text-align: center; background: var(--bg); color: var(--fg); display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+    #big { flex: 1 1 auto; min-height: 45vh; width: 100%; border: none; border-radius: 28px; background: #2e7d32; color: #fff; font-size: 2.1rem; font-weight: bold; line-height: 1.25; cursor: pointer; padding: 20px; transition: background .2s, transform .1s; -webkit-tap-highlight-color: transparent; }
+    #big:active { transform: scale(0.98); }
+    #big small { display: block; font-size: 1.05rem; font-weight: normal; margin-top: 10px; opacity: .95; }
+    #big.busy { background: #ef6c00; }
+    #big.ok { background: #2e7d32; }
+    #big.warn { background: #b26a00; }
+    #msg { font-size: 1.15rem; font-weight: bold; margin: 0; min-height: 2.6em; }
+    #help { background: var(--panel); border-radius: 12px; padding: 12px; margin: 0; text-align: left; font-size: 0.95rem; line-height: 1.4; }
+    #last { background: var(--panel); border-radius: 12px; padding: 12px; font-size: 0.95rem; color: var(--muted); }
+    #last b { color: var(--fg); }
+    .row { display: flex; gap: 10px; }
+    .row button { flex: 1; padding: 14px; font-size: 1rem; font-weight: bold; border: none; border-radius: 50px; color: #fff; cursor: pointer; }
+    #maps { background: #2196F3; } #share { background: #9C27B0; } #installa { background: #673AB7; width: 100%; padding: 12px; font-size: 1rem; font-weight: bold; border: none; border-radius: 50px; color: #fff; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    a.link { color: #2196F3; font-weight: bold; font-size: 1.05rem; padding: 8px; }
+    .small { font-size: 0.85rem; color: var(--muted); margin: 0; }
+    .brand { font-size: 0.8rem; color: var(--faint); margin: 0; }
+    [hidden] { display: none !important; }
+    button:focus-visible, a:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <button id="big">🅿️ PARCHEGGIATO QUI<small>Un tocco: salva la posizione</small></button>
+  <p id="msg" role="status" aria-live="polite"></p>
+  <p id="help" hidden></p>
+  <div id="last">Nessun punto salvato</div>
+  <div class="row">
+    <button id="maps" disabled>🗺️ Apri in Maps</button>
+    <button id="share" disabled>📤 Condividi</button>
+  </div>
+  <a class="link" href="parcheggio.html">➡️ Apri Parcheggio Facile (elenco, nomi, backup)</a>
+  <button id="installa">📲 Installa app</button>
+  <p class="small" id="installInfo"></p>
+  <p class="brand">by Lollo ®2026 · v1.8</p>
+<script>
+(function() {
+  'use strict';
+  const el = id => document.getElementById(id);
+  const RKEY = 'parcheggioRapido', LKEY = 'parcheggioRapidoUltimo';
+  const MAXQ = 10, REFINE_MS = 120000;
+  const GOOD_M = 10, OK_M = 30, STALL_MS = 8000, WINDOW_MS = 20000, HARD_MS = 45000, NOFIX_HINT_MS = 7000;
+  let session = null, wakeLock = null;
+
+  const valid = p => p && Number.isFinite(p.lat) && Number.isFinite(p.lon) && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180;
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const msg = (t, color) => { el('msg').textContent = t; el('msg').style.color = color || ''; };
+  const accOf = r => Number.isFinite(r && r.accuracy) ? r.accuracy : Infinity;
+  const accText = a => Number.isFinite(a) ? `±${Math.round(a)} m` : 'precisione sconosciuta';
+  const when = ts => new Date(ts).toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch {} };
+
+  // ---- memoria: coda di punti per Parcheggio Facile + copia dell'ultimo punto per questa pagina ----
+  function readQ() { try { const a = JSON.parse(localStorage.getItem(RKEY)); return Array.isArray(a) ? a.filter(r => valid(r) && typeof r.id === 'string') : []; } catch { return []; } }
+  function readLast() { try { const r = JSON.parse(localStorage.getItem(LKEY)); return valid(r) ? r : null; } catch { return null; } }
+  function store(rec) {
+    let ok = false;
+    try {
+      const q = readQ().filter(r => r.id !== rec.id); q.unshift(rec);
+      localStorage.setItem(RKEY, JSON.stringify(q.slice(0, MAXQ))); ok = true;
+    } catch {}
+    try { localStorage.setItem(LKEY, JSON.stringify(rec)); ok = true; } catch {}
+    return ok;
+  }
+
+  function renderLast() {
+    const r = readLast(), box = el('last');
+    box.replaceChildren();
+    if (!r) { box.textContent = 'Nessun punto salvato'; }
+    else {
+      const b = document.createElement('b'); b.textContent = 'Ultimo punto: ' + when(r.savedAt) + (Number.isFinite(r.accuracy) ? ' · ' + accText(r.accuracy) : '');
+      box.append(b, document.createElement('br'), document.createTextNode(`${r.lat.toFixed(6)}, ${r.lon.toFixed(6)}`));
+    }
+    el('maps').disabled = !r; el('share').disabled = !r;
+  }
+  function setBig(state, html) {
+    const b = el('big'); b.className = state || '';
+    b.innerHTML = html;
+  }
+  const IDLE = '🅿️ PARCHEGGIATO QUI<small>Un tocco: salva la posizione</small>';
+
+  function helpFor(error) {
+    const h = el('help'); h.hidden = false;
+    if (error && error.code === 1) h.textContent = 'Permesso negato. Tocca il lucchetto (o ⋮ → Info sito) vicino all’indirizzo → Autorizzazioni → Posizione → Consenti. Poi tocca di nuovo il grande pulsante verde.';
+    else h.textContent = 'Non arriva il segnale GPS. 1) Accendi la Posizione dal menu a tendina del telefono (icona «Posizione»). 2) Se compare la richiesta di attivarla, tocca «OK». 3) Resta all’aperto e tocca di nuovo il pulsante verde. Il browser non può accendere il GPS da solo.';
+  }
+
+  // ---- rilevamento ----
+  function persist(s, fin) {
+    const b = s.best;
+    const rec = {id: s.recId, lat: b.lat, lon: b.lon, accuracy: Number.isFinite(b.acc) ? b.acc : null, savedAt: s.savedAt, upd: Date.now(), fin: !!fin};
+    s.saved = store(rec) || s.saved; s.rec = rec; renderLast();
+    return rec;
+  }
+  function onFix(result) {
+    if (!session) return;
+    const s = session, c = result.coords, now = Date.now();
+    if (Number.isFinite(result.timestamp) && result.timestamp < s.start - 2000) return;   // fix vecchio
+    const cand = {lat: c.latitude, lon: c.longitude, acc: Number.isFinite(c.accuracy) && c.accuracy >= 0 ? c.accuracy : Infinity};
+    if (!valid(cand)) return;
+    if (!s.firstAt) { s.firstAt = now; buzz(60); el('help').hidden = true; }
+    if (!s.best || cand.acc < s.best.acc) { s.best = cand; s.improved = now; s.gotNew = true; persist(s, false); }   // salvato SUBITO a ogni miglioramento
+    msg(`Salvato ${accText(s.best.acc)} — sto cercando di migliorare…`, '');
+    setBig('busy', `⏳ SALVATO ${accText(s.best.acc)}<small>Sto migliorando… tocca per fermare</small>`);
+    if (s.best.acc <= GOOD_M) finish();
+  }
+  function onError(error) {
+    if (!session) return;
+    if (error && error.code === 1) { finish(error); return; }
+    session.lastError = error;
+  }
+  function tick() {
+    if (!session) return;
+    const s = session, now = Date.now();
+    if (!s.firstAt && now - s.start >= NOFIX_HINT_MS && el('help').hidden) { helpFor(s.lastError); msg('Cerco il segnale GPS…', ''); }
+    if (s.firstAt && (now - s.firstAt >= WINDOW_MS || (s.best.acc <= OK_M && now - s.improved >= STALL_MS))) finish();
+    else if (now - s.start >= HARD_MS) finish();
+  }
+  function release() { try { if (wakeLock) wakeLock.release(); } catch {} wakeLock = null; }
+  function finish(error) {
+    if (!session) return;
+    const s = session; session = null;
+    try { navigator.geolocation.clearWatch(s.id); } catch {}
+    clearInterval(s.timer); release();
+    if (!s.best) {
+      setBig('', IDLE);
+      if (error === 'cancel') { msg('Annullato.', ''); el('help').hidden = true; }
+      else { msg('❌ Nessuna posizione salvata.', '#c62828'); helpFor(error || s.lastError); buzz([200, 100, 200]); }
+      return;
+    }
+    const acc = s.best.acc;
+    if (s.gotNew) persist(s, true);
+    else if (s.rec) { s.rec.fin = true; s.rec.upd = Date.now(); store(s.rec); }
+    if (!s.saved) { setBig('warn', '⚠️ NON SALVATO<small>Memoria non disponibile: usa Condividi</small>'); msg('⚠️ La memoria del browser non risponde. Tocca «Condividi» per mandarti il punto.', '#c62828'); buzz([200, 100, 200]); return; }
+    el('help').hidden = true; buzz([120, 60, 120]);
+    if (!s.gotNew) { setBig('ok', `✅ GIÀ SALVATO ${accText(acc)}<small>Nessun segnale migliore del precedente</small>`); msg('Il punto precedente era già il migliore.', ''); return; }
+    if (acc <= OK_M) { setBig('ok', `✅ SALVATO!<small>${accText(acc)} · tocca per salvare di nuovo</small>`); msg('Posizione salvata ✅', ''); }
+    else if (acc <= 100) { setBig('warn', `✅ SALVATO ${accText(acc)}<small>Precisione media · tocca per riprovare</small>`); msg('Salvato. Se puoi, riprova all’aperto per migliorarlo.', ''); }
+    else { setBig('warn', `⚠️ SALVATO ma poco preciso ${accText(acc)}<small>Tocca di nuovo all’aperto</small>`); msg('Poco preciso: appena puoi tocca di nuovo il pulsante all’aperto.', '#b26a00'); }
+  }
+  async function keepAwake() { try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch {} }
+
+  el('big').addEventListener('click', () => {
+    if (session) { finish(session.best ? undefined : 'cancel'); return; }     // 2° tocco: ferma e tieni il migliore
+    if (!window.isSecureContext) { msg('Per usare il GPS apri l’app da un indirizzo HTTPS.', '#c62828'); return; }
+    if (!navigator.geolocation) { msg('Geolocalizzazione non disponibile in questo browser.', '#c62828'); return; }
+    const now = Date.now(), last = readQ()[0];
+    const base = last && now - (last.upd || last.savedAt) < REFINE_MS ? last : null;   // doppio tocco ravvicinato = affina, non duplica
+    session = {start: now, firstAt: 0, improved: 0, best: base ? {lat: base.lat, lon: base.lon, acc: accOf(base)} : null, gotNew: false,
+      recId: base ? base.id : uid(), savedAt: base ? base.savedAt : now, rec: base, saved: !!base, lastError: null, id: null, timer: null};
+    session.timer = setInterval(tick, 500);
+    el('help').hidden = true; buzz(40);
+    setBig('busy', '⏳ CERCO IL GPS…<small>Tieni lo schermo acceso · tocca per annullare</small>');
+    msg('Rilevamento in corso…', '');
+    keepAwake();
+    try { session.id = navigator.geolocation.watchPosition(onFix, onError, {enableHighAccuracy: true, timeout: 20000, maximumAge: 0}); }
+    catch (error) { finish(error); }
+  });
+  document.addEventListener('visibilitychange', () => { if (session && document.visibilityState === 'visible') keepAwake(); });
+
+  // ---- scorciatoie sul punto salvato ----
+  const mapsUrl = r => `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}`;
+  el('maps').addEventListener('click', () => { const r = readLast(); if (r) window.location.assign(mapsUrl(r)); });
+  async function copy(text) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } } catch {}
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta); ta.select();
+    try { return document.execCommand('copy') === true; } catch { return false; } finally { ta.remove(); }
+  }
+  el('share').addEventListener('click', async () => {
+    const r = readLast(); if (!r) return;
+    const url = mapsUrl(r);
+    if (navigator.share) {
+      try { await navigator.share({title: 'Posizione parcheggio', text: 'Ho parcheggiato qui', url}); msg('Condiviso.', ''); return; }
+      catch (error) { if (error.name === 'AbortError') return; }
+    }
+    msg(await copy(`Ho parcheggiato qui: ${url}`) ? 'Link copiato: incollalo in un messaggio.' : `Copia non riuscita. Coordinate: ${r.lat}, ${r.lon}`, '');
+  });
+
+  // ---- installazione ----
+  const web = ['https:', 'http:'].includes(location.protocol);
+  let installPrompt = null;
+  const installed = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (installed()) el('installa').hidden = true;
+  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; });
+  el('installa').addEventListener('click', async () => {
+    if (installPrompt) {
+      const p = installPrompt; installPrompt = null;
+      try { await p.prompt(); const c = await p.userChoice; el('installInfo').textContent = c.outcome === 'accepted' ? 'Installazione richiesta.' : 'Installazione annullata.'; }
+      catch { el('installInfo').textContent = 'Apri il menu del browser (⋮) e scegli «Installa app» o «Aggiungi alla schermata Home».'; }
+      return;
+    }
+    el('installInfo').textContent = !web || !window.isSecureContext ? 'Per installare pubblica l’app su un indirizzo HTTPS e aprila da lì.'
+      : /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'Su iPhone/iPad: tocca Condividi, poi «Aggiungi alla schermata Home».'
+      : 'Apri il menu del browser (⋮) e scegli «Installa app» o «Aggiungi alla schermata Home».';
+  });
+  window.addEventListener('appinstalled', () => { installPrompt = null; el('installa').hidden = true; el('installInfo').textContent = 'App installata.'; });
+  if (web && window.isSecureContext && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}
+  renderLast();
+})();
+</script>
+</body>
+</html>

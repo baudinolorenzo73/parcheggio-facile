@@ -1,6 +1,40 @@
-PARCHEGGIO FACILE — VERSIONE CORRETTA
+PARCHEGGIO FACILE — v1.8 (by Lollo ®2026)
 Apri parcheggio.html per visualizzare la pagina.
 Per installarla su Android, pubblica TUTTI i file di questa cartella nello stesso percorso su un sito HTTPS. Apri parcheggio.html in Chrome, poi menu > Aggiungi alla schermata Home / Installa app. Non basta scaricare l’HTML.
 Dopo il primo caricamento online completato, la pagina può riaprirsi offline; GPS dipende dal dispositivo, le mappe esterne dalla connessione o dalle mappe già scaricate nella relativa app.
-La posizione resta nel browser e nello stesso indirizzo del sito. Non viene caricata su un server dall’app. Aprire Maps o condividere invia la posizione al servizio scelto. Cambiando sito/browser o cancellando i dati del browser non si ritrova il parcheggio precedente: copia prima le coordinate.
+Le posizioni restano nel browser e nello stesso indirizzo del sito: per questo usa il BACKUP (vedi sotto). Non viene caricata su un server dall’app. Aprire Maps o condividere invia la posizione al servizio scelto. Cambiando sito/browser o cancellando i dati del browser non si ritrova il parcheggio precedente: copia prima le coordinate.
 Correzioni: validazione dati, errori memoria, errori GPS, prevenzione richieste simultanee, precisione e data, pulsanti disabilitati correttamente, link universali Maps, copia e condivisione, conferma cancellazione, rimozione X che portava a pagina vuota, supporto zoom, manifest e cache offline.
+
+Novità v1.1: il GPS non salva più il primo fix (spesso impreciso, anche centinaia di metri) ma segue il segnale fino a 20 secondi e salva il più preciso; si ferma da solo sotto i 10 m. Durante la ricerca il pulsante diventa "Salva ora" (o "Annulla"). Posizioni oltre ±500 m non vengono salvate, così non sovrascrivono un parcheggio buono. Corretto anche il funzionamento offline (radice del sito e link con parametri) e l'aggiornamento immediato del service worker.
+
+Novità v1.2: cancellando la posizione, o salvandone una nuova al suo posto, quella precedente non va persa: compare il pulsante «Ripristina posizione precedente» (si può premere anche più volte per scambiare le due). Non serve più la finestra di conferma.
+
+Novità v1.3: fino a 10 posizioni, chiamate P1, P2… in automatico. Si possono rinominare (max 30 caratteri, nomi diversi tra loro), cancellare una per volta, più di una insieme («Cancella più posizioni…») oppure tutte. «Ripristina» annulla l'ultima cancellazione. Le posizioni delle versioni precedenti vengono convertite da sole in P1 e P2.
+
+Novità v1.4 — BACKUP: le posizioni nel browser si perdono se svuoti i dati del sito. Per questo:
+- «Scarica file»: salva un file .gpx nella cartella Download del telefono.
+- «Invia a Drive…»: apre il menu di condivisione di Android; scegli Drive (o WhatsApp, e-mail…). Se il browser non lo permette, scarica il file e condividilo da «File».
+- «Importa da file»: rimette nell'app le posizioni di un backup (aggiunge, non cancella; salta quelle già presenti).
+L'app avvisa se non hai mai fatto il backup o se hai modificato qualcosa dopo l'ultimo. Il file GPX si apre anche con Maps, OsmAnd e le altre app di trekking.
+
+Novità v1.5: pulsante «Installa app» sempre visibile (si nasconde da solo se l'app è già installata; se il browser non offre l'installazione diretta, mostra come fare dal menu). Tema scuro: segue in automatico quello del telefono; il pulsante 🌙/☀️ in alto a destra forza chiaro o scuro e la scelta viene ricordata.
+
+Novità v1.6 — PARCHEGGIO RAPIDO (rapido.html): una pagina con un solo grande pulsante verde, per quando hai fretta.
+- Un tocco: l'app salva SUBITO il primo punto GPS e poi continua a migliorarlo (fino a 20 secondi, si ferma sotto i 10 m). Ogni miglioramento viene scritto subito in memoria: se chiudi o blocchi il telefono, il punto c'è già.
+- Se tocchi di nuovo entro 2 minuti, affina lo stesso punto (non ne crea un altro). Secondo tocco durante la ricerca: ferma e tiene il migliore.
+- Vibra quando ha il punto e mostra il colore: verde = ok, arancione = poco preciso, riprova all'aperto.
+- Pulsanti «Apri in Maps» e «Condividi» sull'ultimo punto: condividendolo ti mandi il punto anche fuori dall'app.
+- Si può installare come app a sé (icona verde con fulmine): mettila sulla schermata Home.
+- GPS spento: la pagina mostra cosa fare (la Posizione si accende dal menu a tendina del telefono). Un sito web non può accendere il GPS da solo; chiede però il permesso e Chrome può proporre di attivarlo.
+- Più tardi, aprendo Parcheggio Facile, i punti di Rapido vengono importati da soli come nuove posizioni (P1, P2…). Funziona perché le due pagine stanno nella stessa cartella/sito e nello stesso browser. Se l'elenco è pieno (10) i punti restano in attesa finché cancelli qualcosa.
+
+Novità v1.7: i punti arrivati da Parcheggio Rapido si riconoscono nell'elenco: nome R1, R2… (invece di P1, P2…), icona ⚡ (i normali hanno 🅿️), bordo giallo e la scritta «Parcheggio Rapido». Restano riconoscibili anche nel backup GPX e dopo l'importazione. Si possono rinominare come gli altri.
+
+Novità v1.8 — PREFERITI IN CARTELLE: in alto ci sono due schede, «🅿️ Parcheggi» (le tue 10 posizioni temporanee) e «⭐ Preferiti» (posti fissi, per esempio il posteggio di casa, del lavoro o di un'escursione).
+- Cartelle: «Nuova cartella» (fino a 20). Tocca il nome per chiuderla o aprirla; ✏️ la rinomina, 🗑️ la cancella (con conferma se contiene preferiti).
+- Aggiungere un posto: dalla scheda Parcheggi scegli una posizione e tocca «⭐ Aggiungi ai preferiti…», poi la cartella (o «Nuova cartella…»). Resta anche tra i parcheggi. Se la posizione si chiama P1 o R1 il preferito prende un nome libero F1, F2…; se l'hai rinominata tiene il tuo nome.
+- Oppure, nella scheda Preferiti, «Salva qui come preferito»: sceglie la cartella e rileva il GPS come per un parcheggio.
+- Per ogni preferito: Apri in Maps, Naviga, Copia, Condividi, Rinomina, Cancella e «Sposta in un’altra cartella…». Fino a 100 preferiti.
+- «Ripristina» annulla l'ultima cancellazione di un preferito o di una cartella (separato da quello dei parcheggi).
+- I preferiti non contano nel limite di 10 parcheggi e non vengono toccati da «Cancella tutte» dei parcheggi.
+- Il backup GPX comprende anche cartelle (anche vuote) e preferiti; l'importazione li rimette a posto senza creare doppioni.

@@ -5,23 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parcheggio Facile</title>
   <meta name="theme-color" content="#2196f3">
+  <meta name="color-scheme" content="light dark">
+  <script>try { var t = localStorage.getItem('parcheggiTema'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; color: #333; }
+    :root { color-scheme: light; --bg: #f0f4f8; --card: #ffffff; --fg: #333333; --panel: #e9ecef; --muted: #555555; --line: #dde3ea; --selbg: #e8f3fd; --faint: #888888; --shadow: rgba(0,0,0,0.1); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #0f1419; --card: #1a2129; --fg: #e6e9ec; --panel: #252f3a; --muted: #a3afbb; --line: #34404d; --selbg: #12304a; --faint: #7d8996; --shadow: rgba(0,0,0,0.5); } }
+    :root[data-theme="dark"] { color-scheme: dark; --bg: #0f1419; --card: #1a2129; --fg: #e6e9ec; --panel: #252f3a; --muted: #a3afbb; --line: #34404d; --selbg: #12304a; --faint: #7d8996; --shadow: rgba(0,0,0,0.5); }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: var(--bg); color: var(--fg); }
+    :root[data-theme="dark"] button:not(#tema) { filter: brightness(0.9); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button:not(#tema) { filter: brightness(0.9); } }
+    #tema { position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; padding: 0; margin: 0; border-radius: 50%; background: var(--panel); color: var(--fg); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+    #installa { background-color: #673AB7; color: white; }
     .container { 
       max-width: 400px; 
       margin: 0 auto; 
-      background: white; 
+      background: var(--card); 
       padding: 30px 20px; 
       border-radius: 16px; 
-      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      box-shadow: 0 8px 20px var(--shadow);
       position: relative; /* Necessario per la X */
     }
     h1 { font-size: 1.8rem; margin-bottom: 10px; margin-top: 25px; }
     button { display: block; width: 100%; padding: 18px; margin: 10px 0; font-size: 1.2rem; font-weight: bold; border: none; border-radius: 50px; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
     button:active { transform: scale(0.97); }
-    #salva { background-color: #4CAF50; color: white; }
+    #salva, #salvaFav { background-color: #4CAF50; color: white; }
+    #salva.busy, #salvaFav.busy { background-color: #FF9800; }
     #apri { background-color: #2196F3; color: white; }
     #naviga { background-color: #009688; color: white; }
     #cancella { background-color: #f44336; color: white; font-size: 1rem; padding: 12px; }
@@ -49,89 +59,534 @@
     }
     #chiudiX:active { background-color: #bdbdbd; }
 
-    .info { background: #e9ecef; padding: 15px; border-radius: 10px; margin: 20px 0; min-height: 50px; }
+    .info { background: var(--panel); padding: 15px; border-radius: 10px; margin: 20px 0; min-height: 50px; }
     .info p { margin: 5px 0; font-size: 1rem; word-break: break-all; }
-    .status { color: #555; font-size: 0.9rem; margin-top: 10px; }
+    .status { color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
     .flex-row { display: flex; gap: 10px; }
     .flex-row button { flex: 1; padding: 14px; font-size: 1rem; }
     [hidden] { display: none !important; }
     button:disabled { opacity: .5; cursor: default; }
-    button:focus-visible { outline: 3px solid #333; outline-offset: 3px; }
+    button:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
     .disabled-btn { opacity: 0.5; pointer-events: none; }
+    #rinomina { background-color: #3F51B5; color: white; font-size: 1rem; padding: 12px; }
+    #ripristina { background-color: #607D8B; color: white; font-size: 1rem; padding: 12px; }
+    #gestisci, #fine, #tutte { background-color: #78909C; color: white; font-size: 1rem; padding: 12px; }
+    #scarica, #invia, #importa { background-color: #00796B; color: white; font-size: 1rem; padding: 12px; }
+    #backupInfo { margin: 0 0 8px; text-align: left; }
+    #cancSel, #cancTutte { background-color: #f44336; color: white; font-size: 1rem; padding: 12px; }
+    h2 { font-size: 1rem; margin: 18px 0 6px; text-align: left; }
+    .lista { text-align: left; }
+    .riga { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 6px 0; border: 2px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--card); }
+    .riga.rapido { border-left: 7px solid #FFC107; }
+    .riga.fav { border-left: 7px solid #FF9800; }
+    .tabs { display: flex; gap: 8px; margin: 6px 0 4px; }
+    .tab { flex: 1; margin: 0; padding: 12px; font-size: 1rem; background: var(--panel); color: var(--fg); }
+    .tab.on { background: #2196F3; color: #fff; }
+    .cart { display: flex; align-items: center; gap: 6px; margin: 12px 0 4px; text-align: left; }
+    .cart-head { flex: 1; font-weight: bold; padding: 10px 12px; border-radius: 12px; background: var(--panel); cursor: pointer; word-break: break-word; }
+    .mini { width: 42px; height: 42px; padding: 0; margin: 0; border-radius: 50%; font-size: 1.05rem; background: var(--panel); color: var(--fg); flex: none; display: flex; align-items: center; justify-content: center; }
+    #nuovaCart { background-color: #795548; color: #fff; font-size: 1rem; padding: 12px; }
+    #cartella { background-color: #FF9800; color: #fff; font-size: 1rem; padding: 12px; }
+    dialog { border: none; border-radius: 16px; background: var(--card); color: var(--fg); width: 90%; max-width: 340px; padding: 18px; text-align: center; }
+    dialog::backdrop { background: rgba(0,0,0,0.55); }
+    dialog button { margin: 6px 0; padding: 14px; font-size: 1rem; }
+    .riga.sel { border-color: #2196F3; background: var(--selbg); }
+    .riga .nome { font-weight: bold; font-size: 1.05rem; }
+    .riga .det { font-size: 0.8rem; color: var(--muted); }
+    .riga input { width: 22px; height: 22px; flex: none; }
+    .riga:focus-visible { outline: 3px solid var(--fg); }
+    .vuota { color: var(--muted); padding: 8px 0; }
+    .small-link { margin: 14px 0 0; font-size: 0.95rem; } .small-link a { color: #2196F3; font-weight: bold; }
+    .brand { margin: 18px 0 0; font-size: 0.8rem; color: var(--faint); }
   </style>
 </head>
 <body>
   <div class="container">
-    
+
+    <button id="tema" aria-label="Cambia tema chiaro/scuro" title="Tema chiaro/scuro">🌙</button>
     <h1>🅿️ Parcheggio Facile</h1>
-    <button id="salva">📍 Salva posizione</button>
-    <button id="apri">🗺️ Apri in Maps</button>
-    <button id="naviga">🚶 Naviga a piedi</button>
-    <div class="flex-row">
-      <button id="copia">📋 Copia coordinate</button>
-      <button id="condividi">📤 Condividi</button>
+    <div class="tabs" id="tabs">
+      <button class="tab on" id="tabPark">🅿️ Parcheggi</button>
+      <button class="tab" id="tabFav">⭐ Preferiti</button>
     </div>
-    <button id="cancella">🗑️ Cancella posizione</button>
+
+    <div id="viewPark">
+      <button id="salva">📍 Salva posizione</button>
+      <h2 id="titoloLista">Posizioni salvate</h2>
+      <div class="lista" id="lista" role="listbox" aria-labelledby="titoloLista"></div>
+    </div>
+
+    <div id="viewFav" hidden>
+      <button id="salvaFav">📍 Salva qui come preferito</button>
+      <button id="nuovaCart">📁 Nuova cartella</button>
+      <h2 id="titoloFav">Preferiti</h2>
+      <div class="lista" id="favLista" role="listbox" aria-labelledby="titoloFav"></div>
+    </div>
+
     <div class="info" id="info"><p>Nessuna posizione salvata</p></div>
+
+    <div id="azioni">
+      <button id="apri">🗺️ Apri in Maps</button>
+      <button id="naviga">🚶 Naviga a piedi</button>
+      <div class="flex-row">
+        <button id="copia">📋 Copia coordinate</button>
+        <button id="condividi">📤 Condividi</button>
+      </div>
+      <div class="flex-row">
+        <button id="rinomina">✏️ Rinomina</button>
+        <button id="cancella">🗑️ Cancella</button>
+      </div>
+      <button id="cartella">⭐ Aggiungi ai preferiti…</button>
+      <button id="gestisci">☑️ Cancella più posizioni…</button>
+    </div>
+
+    <div id="modifica" hidden>
+      <button id="tutte">☑️ Seleziona tutte</button>
+      <button id="cancSel">🗑️ Cancella selezionate</button>
+      <button id="cancTutte">🗑️ Cancella tutte</button>
+      <button id="fine">✔️ Fine</button>
+    </div>
+
+    <div id="backup">
+      <h2>Backup (consigliato)</h2>
+      <p class="status" id="backupInfo"></p>
+      <div class="flex-row">
+        <button id="scarica">💾 Scarica file</button>
+        <button id="invia">☁️ Invia a Drive…</button>
+      </div>
+      <button id="importa">📂 Importa da file</button>
+      <input type="file" id="file" accept=".gpx,.xml,application/gpx+xml,application/xml,text/xml" hidden>
+    </div>
+
+    <dialog id="dlg">
+      <h2 id="dlgTitolo" style="margin-top:0;text-align:center"></h2>
+      <div id="dlgLista"></div>
+      <button id="dlgAnnulla" style="background:var(--panel);color:var(--fg)">Annulla</button>
+    </dialog>
+
+    <button id="ripristina" hidden>↩️ Ripristina</button>
     <p class="status" id="status" role="status" aria-live="polite"></p>
     <p class="status" id="installInfo"></p>
-    <button id="installa" hidden>Installa app</button>
+    <button id="installa">📲 Installa app</button>
+    <p class="small-link"><a href="rapido.html">⚡ Parcheggio Rapido: un solo tocco per salvare</a></p>
+    <p class="brand">by Lollo ®2026 · v1.8</p>
   </div>
 <script>
 (function() {
   'use strict';
   const el = id => document.getElementById(id);
   const status = text => { el('status').textContent = text; };
-  const KEY = 'posizioneParcheggio';
-  let pos = null, busy = false, storageError = '';
+  const SKEY = 'parcheggiPosizioni', OLDKEY = 'posizioneParcheggio', OLDBKEY = 'posizioneParcheggioPrecedente';
+  const MAX = 10, NAME_MAX = 30, MAXF = 20, MAXFAV = 100;
+  let tab = 'park';
+  let db = {items: [], sel: null, undo: [], fav: {folders: [], items: [], sel: null, undo: null}}, busy = false, editing = false, storageError = '';
+  const checked = new Set();
+
+  // ---------- Dati ----------
   function valid(p) {
     return p && typeof p === 'object' && Number.isFinite(p.lat) && Number.isFinite(p.lon)
       && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180;
   }
-  function read() {
+  const validItem = i => valid(i) && typeof i.name === 'string' && i.name && typeof i.id === 'string';
+  function clean(raw) {
+    const list = k => (raw && Array.isArray(raw[k]) ? raw[k] : []).filter(validItem).slice(0, MAX);
+    const items = list('items'), undo = list('undo');
+    const sel = raw && items.some(i => i.id === raw.sel) ? raw.sel : (items.length ? items[items.length - 1].id : null);
+    return {items, sel, undo, rev: raw && Number.isFinite(raw.rev) ? raw.rev : 0, fav: cleanFav(raw)};
+  }
+  function cleanFav(raw) {
+    const f = raw && raw.fav;
+    const folders = (f && Array.isArray(f.folders) ? f.folders : []).filter(x => x && typeof x.id === 'string' && typeof x.name === 'string' && x.name).slice(0, MAXF);
+    const ids = new Set(folders.map(x => x.id));
+    const items = (f && Array.isArray(f.items) ? f.items : []).filter(i => validItem(i) && ids.has(i.folder)).slice(0, MAXFAV);
+    const sel = f && items.some(i => i.id === f.sel) ? f.sel : (items.length ? items[0].id : null);
+    let undo = null;
+    if (f && f.undo && Array.isArray(f.undo.items)) {
+      const fo = f.undo.folder && typeof f.undo.folder.id === 'string' && typeof f.undo.folder.name === 'string' ? {id: f.undo.folder.id, name: f.undo.folder.name} : null;
+      const its = f.undo.items.filter(i => validItem(i) && typeof i.folder === 'string');
+      if (fo || its.length) undo = {folder: fo, items: its};
+    }
+    return {folders, items, sel, undo};
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  function migrate() {          // dalle versioni 1.x: posizione attuale -> P1, "precedente" -> P2
+    const items = [];
+    for (const key of [OLDKEY, OLDBKEY]) {
+      try {
+        const o = JSON.parse(localStorage.getItem(key));
+        if (valid(o)) items.push({id: uid(), name: 'P' + (items.length + 1), lat: o.lat, lon: o.lon,
+          accuracy: Number.isFinite(o.accuracy) ? o.accuracy : null, savedAt: Number.isFinite(o.savedAt) ? o.savedAt : Date.now()});
+      } catch {}
+    }
+    const first = items.length ? items[0].id : null;
+    items.sort((a, b) => a.savedAt - b.savedAt);
+    return {items, sel: first, undo: [], rev: 0};
+  }
+  const persist = d => localStorage.setItem(SKEY, JSON.stringify(d));
+  function load() {
     storageError = '';
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw === null) { pos = null; return; }
-      const saved = JSON.parse(raw);
-      if (!valid(saved)) throw new Error('invalid');
-      pos = saved;
-    } catch (error) {
-      pos = null;
-      storageError = 'Dati salvati non leggibili o memoria non accessibile. Puoi riprovare a salvare la posizione.';
+    let raw = null;
+    try { raw = localStorage.getItem(SKEY); }
+    catch { db = clean(null); storageError = 'Memoria non accessibile: le posizioni non possono essere salvate.'; return; }
+    if (raw === null) { db = clean(migrate()); if (db.items.length) { try { persist(db); } catch {} } return; }
+    try { db = clean(JSON.parse(raw)); }
+    catch { db = clean(null); storageError = 'Dati salvati non leggibili. Puoi riprovare a salvare la posizione.'; }
+  }
+  // modifica "atomica": lavora su una copia e la sostituisce solo se il salvataggio riesce
+  function commit(fn) {
+    const d = JSON.parse(JSON.stringify(db));
+    try { fn(d); d.rev = (d.rev || 0) + 1; persist(d); } catch (e) { return e && e.message === 'FULL' ? 'full' : e && e.message === 'DUP' ? 'dup' : e && e.message === 'SAME' ? 'same' : 'err'; }
+    db = d; return 'ok';
+  }
+  const nameTaken = (d, name, exceptId, list) => (list || d.items).some(i => i.id !== exceptId && i.name.toLowerCase() === name.toLowerCase());
+  function freeName(d, prefix, list) { prefix = prefix || 'P'; for (let n = 1; ; n++) if (!nameTaken(d, prefix + n, null, list)) return prefix + n; }
+  const isRapido = i => i && i.src === 'rapido';
+  const iconOf = i => i && i.folder ? '⭐' : isRapido(i) ? '⚡' : '🅿️';
+  const prefixOf = i => i && i.folder ? 'F' : isRapido(i) ? 'R' : 'P';
+  const curPark = () => db.items.find(i => i.id === db.sel) || null;
+  const curFav = () => db.fav.items.find(i => i.id === db.fav.sel) || null;
+  const cur = () => tab === 'fav' ? curFav() : curPark();
+  const folderName = id => { const f = db.fav.folders.find(x => x.id === id); return f ? f.name : ''; };
+  const hasData = () => db.items.length || db.fav.items.length || db.fav.folders.length;
+  const when = ts => Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
+    ? new Date(ts).toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '';
+  const accText = i => Number.isFinite(i.accuracy) && i.accuracy >= 0 ? `±${Math.round(i.accuracy)} m` : '';
+
+  // ---------- Schermo ----------
+  const collapsed = new Set();
+  function setSave(id, active, label) {
+    const b = el(id);
+    b.classList.toggle('busy', active);
+    b.disabled = !!session && !active;
+    b.textContent = !active ? label : (session && session.best ? `✅ Salva ora (±${Math.round(session.best.accuracy)} m)` : '✖ Annulla');
+  }
+  function addRow(parent, it, selected, extraClass, detail) {
+    const row = document.createElement(editing ? 'label' : 'div');
+    row.className = 'riga' + (selected ? ' sel' : '') + extraClass;
+    row.dataset.id = it.id;
+    if (editing) {
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = checked.has(it.id); row.appendChild(cb);
+    } else { row.tabIndex = 0; row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(selected)); }
+    const box = document.createElement('div');
+    const n = document.createElement('div'); n.className = 'nome'; n.textContent = `${iconOf(it)} ${it.name}`;
+    const dt = document.createElement('div'); dt.className = 'det'; dt.textContent = detail;
+    box.append(n, dt); row.appendChild(box); parent.appendChild(row);
+  }
+  function miniBtn(text, act, label) {
+    const b = document.createElement('button'); b.className = 'mini'; b.textContent = text; b.dataset.act = act; b.setAttribute('aria-label', label); return b;
+  }
+  function renderFav() {
+    const f = db.fav, box = el('favLista'); box.replaceChildren();
+    el('titoloFav').textContent = `Preferiti (${f.items.length}) · ${f.folders.length} ${f.folders.length === 1 ? 'cartella' : 'cartelle'}`;
+    if (!f.folders.length) { const d = document.createElement('div'); d.className = 'vuota'; d.textContent = 'Nessuna cartella: creane una con «Nuova cartella» (es. Casa, Lavoro, Montagna), oppure salva un posto e scegli «Nuova cartella…».'; box.appendChild(d); return; }
+    for (const fo of f.folders) {
+      const its = f.items.filter(i => i.folder === fo.id).sort((a, b) => a.name.localeCompare(b.name, 'it', {numeric: true}));
+      const open = !collapsed.has(fo.id);
+      const head = document.createElement('div'); head.className = 'cart'; head.dataset.fid = fo.id;
+      const t = document.createElement('div'); t.className = 'cart-head'; t.tabIndex = 0; t.setAttribute('role', 'button'); t.setAttribute('aria-expanded', String(open));
+      t.textContent = `${open ? '📂' : '📁'} ${fo.name} (${its.length})`;
+      head.append(t, miniBtn('✏️', 'ren', `Rinomina cartella ${fo.name}`), miniBtn('🗑️', 'del', `Cancella cartella ${fo.name}`));
+      box.appendChild(head);
+      if (open && !its.length) { const d = document.createElement('div'); d.className = 'vuota'; d.textContent = 'Cartella vuota'; box.appendChild(d); }
+      if (open) for (const it of its) addRow(box, it, it.id === f.sel, ' fav', [when(it.savedAt), accText(it)].filter(Boolean).join(' · '));
     }
   }
   function render() {
+    const items = db.items, fav = db.fav;
+    if (!items.length) editing = false;
+    if (editing) tab = 'park';
+    for (const id of [...checked]) if (!items.some(i => i.id === id)) checked.delete(id);
+    el('tabs').hidden = editing;
+    el('tabPark').classList.toggle('on', tab === 'park'); el('tabFav').classList.toggle('on', tab === 'fav');
+    el('viewPark').hidden = tab !== 'park'; el('viewFav').hidden = tab !== 'fav';
+    el('titoloLista').textContent = `Posizioni salvate (${items.length}/${MAX})`;
+    const lista = el('lista'); lista.replaceChildren();
+    if (!items.length) { const d = document.createElement('div'); d.className = 'vuota'; d.textContent = 'Nessuna posizione salvata'; lista.appendChild(d); }
+    for (const it of [...items].reverse()) addRow(lista, it, !editing && it.id === db.sel, isRapido(it) ? ' rapido' : '', [isRapido(it) ? 'Parcheggio Rapido' : '', when(it.savedAt), accText(it)].filter(Boolean).join(' · '));
+    renderFav();
+    const c = cur();
     el('info').replaceChildren();
-    const lines = pos ? ['Posizione salvata:', `Lat: ${pos.lat.toFixed(6)}`, `Lon: ${pos.lon.toFixed(6)}`] : ['Nessuna posizione salvata'];
-    if (pos && Number.isFinite(pos.accuracy) && pos.accuracy >= 0) lines.push(`Precisione GPS: circa ${Math.round(pos.accuracy)} m`);
-    if (pos && Number.isFinite(pos.savedAt) && Number.isFinite(new Date(pos.savedAt).getTime())) lines.push(new Date(pos.savedAt).toLocaleString('it-IT'));
-    for (const text of lines) { const p = document.createElement('p'); p.textContent = text; el('info').appendChild(p); }
-    for (const id of ['apri','naviga','copia','condividi','cancella']) el(id).disabled = !pos || busy;
-    el('salva').disabled = busy;
+    const lines = c ? [`${iconOf(c)} ${c.name}`] : [tab === 'fav' ? 'Nessun preferito selezionato' : 'Nessuna posizione selezionata'];
+    if (c && c.folder) lines.push(`📁 ${folderName(c.folder)}`);
+    if (c) lines.push(`Lat: ${c.lat.toFixed(6)}`, `Lon: ${c.lon.toFixed(6)}`);
+    if (c && accText(c)) lines.push(`Precisione GPS: circa ${accText(c).slice(1)}`);
+    if (c && when(c.savedAt)) lines.push(new Date(c.savedAt).toLocaleString('it-IT'));
+    lines.forEach((text, k) => { const p = document.createElement('p'); p.textContent = text; if (c && k === 0) p.style.fontWeight = 'bold'; el('info').appendChild(p); });
+    el('info').hidden = editing;
+    el('azioni').hidden = editing; el('modifica').hidden = !editing;
+    for (const id of ['apri','naviga','copia','condividi','rinomina','cancella','cartella']) el(id).disabled = !c || busy;
+    el('cartella').textContent = tab === 'fav' ? '📁 Sposta in un’altra cartella…' : '⭐ Aggiungi ai preferiti…';
+    el('gestisci').hidden = tab === 'fav';
+    el('gestisci').disabled = !items.length || busy;
+    el('cancSel').textContent = `🗑️ Cancella selezionate (${checked.size})`;
+    el('cancSel').disabled = !checked.size;
+    el('tutte').textContent = checked.size === items.length ? '☐ Deseleziona tutte' : '☑️ Seleziona tutte';
+    const u = tab === 'fav' ? (fav.undo ? fav.undo : null) : (db.undo.length ? {folder: null, items: db.undo} : null);
+    el('ripristina').hidden = !u || editing;
+    el('ripristina').disabled = busy;
+    if (u) el('ripristina').textContent = u.folder ? `↩️ Ripristina cartella «${u.folder.name}»${u.items.length ? ` (${u.items.length})` : ''}`
+      : u.items.length === 1 ? `↩️ Ripristina «${u.items[0].name}»` : `↩️ Ripristina ${u.items.length} ${tab === 'fav' ? 'preferiti' : 'posizioni'} cancellati`;
+    el('backup').hidden = editing;
+    const bk = readBackupInfo();
+    el('backupInfo').textContent = !hasData() && !bk ? 'Niente da salvare. Puoi importare un backup già fatto.'
+      : !bk ? '⚠️ Nessun backup: se svuoti i dati del browser posizioni e preferiti si perdono. Scarica il file o invialo a Drive.'
+      : bk.rev < (db.rev || 0) ? `⚠️ Ci sono modifiche dopo l’ultimo backup (${when(bk.at)}). Rifai il backup.`
+      : `✅ Backup aggiornato (${when(bk.at)}).`;
+    el('scarica').disabled = !hasData(); el('invia').disabled = !hasData();
+    el('importa').disabled = busy;
+    setSave('salva', !!session && !session.fav, '📍 Salva posizione');
+    setSave('salvaFav', !!session && !!session.fav, '📍 Salva qui come preferito');
   }
-  const maps = p => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
-  el('salva').addEventListener('click', () => {
-    if (busy) return;
+  function select(id) {
+    if (editing) return;
+    if (tab === 'fav') { if (id === db.fav.sel || !db.fav.items.some(i => i.id === id)) return; db.fav.sel = id; }
+    else { if (id === db.sel || !db.items.some(i => i.id === id)) return; db.sel = id; }
+    try { persist(db); } catch {} render(); status('');
+  }
+  function onListClick(event) {
+    const row = event.target.closest('.riga'); if (!row) return;
+    if (editing) { if (event.target.tagName !== 'INPUT') return; event.target.checked ? checked.add(row.dataset.id) : checked.delete(row.dataset.id); render(); }
+    else select(row.dataset.id);
+  }
+  function onListKey(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('.riga'), head = event.target.closest('.cart-head');
+    if (row && !editing) { event.preventDefault(); select(row.dataset.id); }
+    else if (head) { event.preventDefault(); head.click(); }
+  }
+  el('lista').addEventListener('click', onListClick);
+  el('lista').addEventListener('keydown', onListKey);
+  el('favLista').addEventListener('keydown', onListKey);
+  el('favLista').addEventListener('click', event => {
+    const head = event.target.closest('.cart'), mini = event.target.closest('.mini');
+    if (head && mini) { folderAction(mini.dataset.act, head.dataset.fid); return; }
+    if (head && event.target.closest('.cart-head')) { const id = head.dataset.fid; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); render(); return; }
+    onListClick(event);
+  });
+  el('tabPark').addEventListener('click', () => { tab = 'park'; render(); status(''); });
+  el('tabFav').addEventListener('click', () => { tab = 'fav'; render(); status(''); });
+
+  // --- Rilevamento GPS migliorato ---
+  // Invece di un solo fix (spesso grossolano, da celle/Wi-Fi) seguiamo il GPS per qualche secondo
+  // e teniamo il fix piu' preciso. Ci fermiamo appena la precisione e' buona.
+  const GOOD_M = 10;        // precisione "ottima": stop immediato
+  const OK_M = 30;          // precisione "buona": stop se non migliora piu'
+  const STALL_MS = 8000;    // tempo senza miglioramenti per fermarsi a OK_M
+  const WINDOW_MS = 20000;  // tempo massimo dal primo fix
+  const HARD_MS = 45000;    // tempo massimo totale (include la richiesta di permesso)
+  const MAX_SAVE_M = 500;   // oltre questa incertezza non sovrascriviamo la posizione salvata
+  let session = null;
+  const errorText = error => ({1:'Permesso GPS negato. Abilita la posizione nelle impostazioni del browser.',2:'Posizione non disponibile. Controlla il GPS e riprova all’aperto.',3:'Tempo scaduto. Riprova all’aperto.'})[error && error.code] || 'Impossibile rilevare la posizione.';
+  function onFix(result) {
+    if (!session) return;
+    const c = result.coords, now = Date.now();
+    if (Number.isFinite(result.timestamp) && result.timestamp < session.startedAt - 2000) return; // fix vecchio/in cache
+    const cand = {lat: c.latitude, lon: c.longitude, accuracy: Number.isFinite(c.accuracy) && c.accuracy >= 0 ? c.accuracy : Infinity, savedAt: now};
+    if (!valid(cand)) return;
+    if (!session.firstFixAt) session.firstFixAt = now;
+    if (!session.best || cand.accuracy < session.best.accuracy) { session.best = cand; session.lastImprovAt = now; }
+    const shown = a => Number.isFinite(a) ? `±${Math.round(a)} m` : 'sconosciuta';
+    status(`Precisione attuale ${shown(cand.accuracy)}, migliore ${shown(session.best.accuracy)}. Resta all’aperto…`);
+    render();
+    if (session.best.accuracy <= GOOD_M) finish();
+  }
+  function onError(error) {
+    if (!session) return;
+    if (error && error.code === 1) { finish(error); return; }   // permesso negato: inutile aspettare
+    session.lastError = error;                                  // timeout/non disponibile: puo' ancora arrivare un fix
+  }
+  function tick() {
+    if (!session) return;
+    const now = Date.now(), best = session.best;
+    if (best && (now - session.firstFixAt >= WINDOW_MS || (best.accuracy <= OK_M && now - session.lastImprovAt >= STALL_MS))) finish();
+    else if (now - session.startedAt >= HARD_MS) finish();
+  }
+  function finish(error) {
+    if (!session) return;
+    const s = session; session = null; busy = false;
+    try { navigator.geolocation.clearWatch(s.id); } catch {}
+    clearInterval(s.timer);
+    const best = s.best;
+    if (!best) { render(); status(error === 'cancel' ? 'Rilevamento annullato.' : errorText(error || s.lastError)); return; }
+    if (best.accuracy > MAX_SAVE_M) { render(); status(`Posizione troppo imprecisa (±${Math.round(best.accuracy)} m): non salvata. Riprova all’aperto, lontano da edifici alti.`); return; }
+    if (s.fav) {                                  // salvataggio nei Preferiti
+      let fname = '', folder = '';
+      const rf = commit(d => {
+        const fid = ensureFolder(d, s.fav);
+        if (d.fav.items.length >= MAXFAV) throw new Error('FULL');
+        fname = freeName(d, 'F', d.fav.items);
+        const it = {id: uid(), folder: fid, name: fname, lat: best.lat, lon: best.lon, accuracy: Number.isFinite(best.accuracy) ? best.accuracy : null, savedAt: best.savedAt};
+        d.fav.items.push(it); d.fav.sel = it.id; folder = d.fav.folders.find(f => f.id === fid).name;
+      });
+      tab = 'fav'; render();
+      status(rf === 'full' ? `Limite raggiunto (${MAXFAV} preferiti, ${MAXF} cartelle): cancella qualcosa.` : rf !== 'ok' ? 'Salvataggio non riuscito: memoria non disponibile o cartella non più presente.'
+        : `Preferito ${fname} salvato in «${folder}»` + (Number.isFinite(best.accuracy) ? ` (±${Math.round(best.accuracy)} m)` : '') + (best.accuracy > OK_M ? '. Precisione media: riprova all’aperto per migliorarla.' : '!'));
+      return;
+    }
+    let name = '';
+    const result = commit(d => {
+      if (d.items.length >= MAX) throw new Error('FULL');
+      name = freeName(d);
+      const item = {id: uid(), name, lat: best.lat, lon: best.lon, accuracy: Number.isFinite(best.accuracy) ? best.accuracy : null, savedAt: best.savedAt};
+      d.items.push(item); d.sel = item.id;
+    });
+    storageError = '';
+    render();
+    if (result === 'full') { status(`Hai già ${MAX} posizioni: cancellane una per salvarne un’altra.`); return; }
+    if (result !== 'ok') { status('Salvataggio non riuscito: memoria non disponibile.'); return; }
+    status(!Number.isFinite(best.accuracy) ? `Salvata come ${name} (precisione sconosciuta).`
+      : best.accuracy > 100 ? `Salvata come ${name}, ma poco precisa (±${Math.round(best.accuracy)} m): riprova all’aperto.`
+      : best.accuracy > OK_M ? `Salvata come ${name} (±${Math.round(best.accuracy)} m). Per più precisione riprova all’aperto.`
+      : `Salvata come ${name}! (±${Math.round(best.accuracy)} m)`);
+  }
+  function startSession(fav) {
+    if (!fav && db.items.length >= MAX) { status(`Hai già ${MAX} posizioni: cancellane una per salvarne un’altra.`); return; }
     if (!window.isSecureContext) { status('Per usare il GPS apri l’app da un indirizzo HTTPS.'); return; }
     if (!navigator.geolocation) { status('Geolocalizzazione non disponibile in questo browser.'); return; }
-    busy = true; render(); status('Rilevamento posizione…');
-    const fail = error => {
-      busy = false; render();
-      status(({1:'Permesso GPS negato. Abilita la posizione nelle impostazioni del browser.',2:'Posizione non disponibile. Controlla il GPS e riprova all’aperto.',3:'Tempo scaduto. Riprova all’aperto.'})[error.code] || 'Impossibile rilevare la posizione.');
-    };
-    try { navigator.geolocation.getCurrentPosition(result => {
-      busy = false;
-      const next = {lat: result.coords.latitude, lon: result.coords.longitude, accuracy: result.coords.accuracy, savedAt: Date.now()};
-      if (!valid(next)) { render(); status('Il GPS ha restituito coordinate non valide.'); return; }
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next)); pos = next; storageError = ''; render();
-        status(next.accuracy > 100 ? 'Posizione salvata, ma poco precisa: riprova all’aperto.' : 'Posizione salvata con successo!');
-      } catch { render(); status('Salvataggio non riuscito: memoria non disponibile. La posizione precedente non è stata sostituita.'); }
-    }, fail, {enableHighAccuracy:true, timeout:15000, maximumAge:0}); } catch (error) { fail(error); }
+    busy = true;
+    session = {startedAt: Date.now(), firstFixAt: 0, lastImprovAt: 0, best: null, lastError: null, id: null, timer: null, fav: fav || null};
+    session.timer = setInterval(tick, 500);
+    render(); status('Rilevamento posizione… resta all’aperto, lontano da edifici alti.');
+    try { session.id = navigator.geolocation.watchPosition(onFix, onError, {enableHighAccuracy:true, timeout:20000, maximumAge:0}); }
+    catch (error) { finish(error); }
+  }
+  const stopSession = () => finish(session.best ? undefined : 'cancel');       // 2° tocco: salva ora / annulla
+  el('salva').addEventListener('click', () => { if (session) stopSession(); else startSession(null); });
+  el('salvaFav').addEventListener('click', async () => {
+    if (session) { stopSession(); return; }
+    if (db.fav.items.length >= MAXFAV) { status(`Hai già ${MAXFAV} preferiti: cancellane qualcuno.`); return; }
+    const pick = await pickFolder('Salva il preferito in quale cartella?');
+    if (pick && !session) startSession(pick);
   });
-  el('apri').addEventListener('click', () => { if (pos) window.location.assign(maps(pos)); });
-  el('naviga').addEventListener('click', () => { if (pos) window.location.assign(`https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lon}&travelmode=walking&dir_action=navigate`); });
+
+  // ---------- Cartelle e preferiti ----------
+  function askName(text, initial) {
+    const input = window.prompt(text, initial);
+    if (input === null) return null;
+    const name = input.replace(/\s+/g, ' ').trim();
+    if (!name) { status('Il nome non può essere vuoto.'); return null; }
+    if (name.length > NAME_MAX) { status(`Nome troppo lungo (massimo ${NAME_MAX} caratteri).`); return null; }
+    return name;
+  }
+  function chooseFolder(title, exceptId) {
+    return new Promise(resolve => {
+      const dlg = el('dlg'), box = el('dlgLista'); box.replaceChildren();
+      el('dlgTitolo').textContent = title;
+      let answer = null;
+      const add = (label, val, color) => {
+        const b = document.createElement('button'); b.textContent = label; b.style.background = color; b.style.color = '#fff';
+        b.addEventListener('click', () => { answer = val; dlg.close(); }); box.appendChild(b);
+      };
+      for (const f of db.fav.folders) if (f.id !== exceptId) add(`📁 ${f.name}`, f.id, '#2196F3');
+      add('➕ Nuova cartella…', '__new', '#795548');
+      dlg.addEventListener('close', () => resolve(answer), {once: true});
+      if (dlg.showModal) dlg.showModal(); else resolve(null);
+    });
+  }
+  el('dlgAnnulla').addEventListener('click', () => el('dlg').close());
+  async function pickFolder(title, exceptId) {
+    const a = await chooseFolder(title, exceptId);
+    if (!a) return null;
+    if (a !== '__new') return {id: a};
+    const n = askName('Nome della nuova cartella (es. Casa, Lavoro, Montagna):', '');
+    return n ? {newName: n} : null;
+  }
+  function ensureFolder(d, pick) {
+    if (pick.id) { if (!d.fav.folders.some(f => f.id === pick.id)) throw new Error('GONE'); return pick.id; }
+    const ex = d.fav.folders.find(f => f.name.toLowerCase() === pick.newName.toLowerCase());
+    if (ex) return ex.id;
+    if (d.fav.folders.length >= MAXF) throw new Error('FULL');
+    const f = {id: uid(), name: pick.newName}; d.fav.folders.push(f); return f.id;
+  }
+  const fixFavSel = d => { if (!d.fav.items.some(i => i.id === d.fav.sel)) d.fav.sel = d.fav.items.length ? d.fav.items[0].id : null; };
+  const favErr = r => r === 'full' ? `Limite raggiunto (${MAXFAV} preferiti, ${MAXF} cartelle).` : r === 'dup' ? 'Questo posto è già nei preferiti di quella cartella.' : r === 'same' ? 'Il preferito è già in quella cartella.' : 'Operazione non riuscita (memoria non accessibile o cartella non più presente).';
+  el('nuovaCart').addEventListener('click', () => {
+    if (busy) return;
+    const name = askName('Nome della nuova cartella (es. Casa, Lavoro, Montagna):', '');
+    if (!name) return;
+    if (db.fav.folders.some(f => f.name.toLowerCase() === name.toLowerCase())) { status(`Esiste già una cartella «${name}».`); return; }
+    const r = commit(d => { if (d.fav.folders.length >= MAXF) throw new Error('FULL'); d.fav.folders.push({id: uid(), name}); });
+    render(); status(r === 'ok' ? `Cartella «${name}» creata.` : favErr(r));
+  });
+  function folderAction(act, fid) {
+    const fo = db.fav.folders.find(f => f.id === fid); if (!fo || busy) return;
+    if (act === 'ren') {
+      const name = askName(`Nuovo nome per la cartella «${fo.name}»:`, fo.name);
+      if (!name || name === fo.name) return;
+      if (db.fav.folders.some(f => f.id !== fid && f.name.toLowerCase() === name.toLowerCase())) { status(`Esiste già una cartella «${name}».`); return; }
+      const r = commit(d => { d.fav.folders.find(f => f.id === fid).name = name; });
+      render(); status(r === 'ok' ? `Cartella rinominata in «${name}».` : favErr(r)); return;
+    }
+    const its = db.fav.items.filter(i => i.folder === fid);
+    if (its.length && !window.confirm(`Cancellare la cartella «${fo.name}» e i suoi ${its.length} preferiti?`)) return;
+    const r = commit(d => { d.fav.undo = {folder: fo, items: its}; d.fav.folders = d.fav.folders.filter(f => f.id !== fid); d.fav.items = d.fav.items.filter(i => i.folder !== fid); fixFavSel(d); });
+    render(); status(r === 'ok' ? `Cartella «${fo.name}» cancellata. Se è stato un errore, tocca «Ripristina».` : favErr(r));
+  }
+  async function addToFav() {
+    const c = curPark(); if (!c || busy) return;
+    const pick = await pickFolder(`Aggiungi «${c.name}» ai preferiti in…`);
+    if (!pick) return;
+    let name = '', folder = '';
+    const r = commit(d => {
+      const fid = ensureFolder(d, pick);
+      if (d.fav.items.length >= MAXFAV) throw new Error('FULL');
+      if (d.fav.items.some(x => x.folder === fid && Math.abs(x.lat - c.lat) < 1e-6 && Math.abs(x.lon - c.lon) < 1e-6)) throw new Error('DUP');
+      const base = /^[PR]\d+$/i.test(c.name) ? '' : c.name;       // nome personalizzato: lo tengo; P1/R1 no
+      name = base && !nameTaken(d, base, null, d.fav.items) ? base : freeName(d, 'F', d.fav.items);
+      const it = {id: uid(), folder: fid, name, lat: c.lat, lon: c.lon, accuracy: Number.isFinite(c.accuracy) ? c.accuracy : null, savedAt: c.savedAt};
+      d.fav.items.push(it); d.fav.sel = it.id; folder = d.fav.folders.find(f => f.id === fid).name;
+    });
+    render(); status(r === 'ok' ? `«${name}» aggiunto ai preferiti, cartella «${folder}» (si trova nella scheda ⭐ Preferiti).` : favErr(r));
+  }
+  async function moveFav() {
+    const c = curFav(); if (!c || busy) return;
+    const pick = await pickFolder(`Sposta «${c.name}» in…`, c.folder);
+    if (!pick) return;
+    let folder = '';
+    const r = commit(d => {
+      const fid = ensureFolder(d, pick);
+      if (fid === c.folder) throw new Error('SAME');
+      const it = d.fav.items.find(i => i.id === c.id); it.folder = fid; folder = d.fav.folders.find(f => f.id === fid).name;
+      collapsed.delete(fid);
+    });
+    render(); status(r === 'ok' ? `«${c.name}» spostato in «${folder}».` : favErr(r));
+  }
+  el('cartella').addEventListener('click', () => { if (tab === 'fav') moveFav(); else addToFav(); });
+  function removeFav(c) {
+    if (busy) return;
+    const r = commit(d => { d.fav.undo = {folder: null, items: [c]}; d.fav.items = d.fav.items.filter(i => i.id !== c.id); fixFavSel(d); });
+    render(); status(r === 'ok' ? `«${c.name}» cancellato. Se è stato un errore, tocca «Ripristina».` : favErr(r));
+  }
+  function restoreFav() {
+    if (!db.fav.undo || busy) return;
+    let back = 0;
+    const r = commit(d => {
+      const u = d.fav.undo; let map = null;
+      if (u.folder) {
+        const same = d.fav.folders.find(f => f.name.toLowerCase() === u.folder.name.toLowerCase());
+        if (same) map = same.id;
+        else if (!d.fav.folders.some(f => f.id === u.folder.id)) { if (d.fav.folders.length >= MAXF) throw new Error('FULL'); d.fav.folders.push(u.folder); }
+      }
+      for (const it of u.items) {
+        if (map && u.folder && it.folder === u.folder.id) it.folder = map;
+        if (!d.fav.folders.some(f => f.id === it.folder)) {
+          if (!d.fav.folders.length) d.fav.folders.push({id: uid(), name: 'Preferiti'});
+          it.folder = d.fav.folders[0].id;
+        }
+        if (d.fav.items.length >= MAXFAV) throw new Error('FULL');
+        if (nameTaken(d, it.name, null, d.fav.items)) it.name = /^F\d+$/i.test(it.name) ? freeName(d, 'F', d.fav.items) : it.name.slice(0, NAME_MAX - 6) + ' (rip.)';
+        if (nameTaken(d, it.name, null, d.fav.items)) it.name = freeName(d, 'F', d.fav.items);
+        d.fav.items.push(it); d.fav.sel = it.id; back++;
+      }
+      d.fav.undo = null;
+    });
+    render(); status(r === 'ok' ? (back === 1 ? 'Preferito ripristinato.' : back ? `Ripristinati ${back} preferiti.` : 'Cartella ripristinata.') : favErr(r));
+  }
+
+  // ---------- Azioni sulla posizione selezionata ----------
+  const maps = p => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
+  el('apri').addEventListener('click', () => { const c = cur(); if (c) window.location.assign(maps(c)); });
+  el('naviga').addEventListener('click', () => { const c = cur(); if (c) window.location.assign(`https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}&travelmode=walking&dir_action=navigate`); });
   async function copy(text) {
     try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } } catch {}
     const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly','');
@@ -141,34 +596,243 @@
     finally { ta.remove(); if (previous && previous.focus) previous.focus(); }
   }
   el('copia').addEventListener('click', async () => {
-    if (!pos) return;
-    status(await copy(`${pos.lat}, ${pos.lon}`) ? 'Coordinate copiate!' : 'Copia non riuscita. Le coordinate sono visibili sopra: puoi selezionarle manualmente.');
+    const c = cur(); if (!c) return;
+    status(await copy(`${c.lat}, ${c.lon}`) ? `Coordinate di ${c.name} copiate!` : 'Copia non riuscita. Le coordinate sono visibili sopra: puoi selezionarle manualmente.');
   });
   el('condividi').addEventListener('click', async () => {
-    if (!pos) return;
-    const url = maps(pos);
+    const c = cur(); if (!c) return;
+    const url = maps(c), lead = tab === 'fav' ? `⭐ ${c.name}` : `Ho parcheggiato qui (${c.name})`;
     if (navigator.share) {
-      try { await navigator.share({title:'Posizione parcheggio',text:'Ho parcheggiato qui',url}); status('Condivisione completata.'); return; }
+      try { await navigator.share({title:'Posizione parcheggio',text:lead,url}); status('Condivisione completata.'); return; }
       catch (error) { if (error.name === 'AbortError') { status('Condivisione annullata.'); return; } }
     }
-    status(await copy(`Ho parcheggiato qui: ${url}`) ? 'Link copiato: puoi incollarlo in un messaggio.' : 'Condivisione e copia non disponibili. Puoi copiare manualmente le coordinate.');
+    status(await copy(`${lead}: ${url}`) ? 'Link copiato: puoi incollarlo in un messaggio.' : 'Condivisione e copia non disponibili. Puoi copiare manualmente le coordinate.');
   });
-  el('cancella').addEventListener('click', () => {
-    if (!pos || busy || !window.confirm('Cancellare la posizione del parcheggio?')) return;
-    try { localStorage.removeItem(KEY); pos = null; render(); status('Posizione cancellata.'); }
-    catch { status('Cancellazione non riuscita: memoria non accessibile.'); }
+  el('rinomina').addEventListener('click', () => {
+    const c = cur(); if (!c || busy) return;
+    const input = window.prompt(`Nuovo nome per «${c.name}» (max ${NAME_MAX} caratteri):`, c.name);
+    if (input === null) return;
+    const name = input.replace(/\s+/g, ' ').trim();
+    if (!name) { status('Il nome non può essere vuoto.'); return; }
+    if (name.length > NAME_MAX) { status(`Nome troppo lungo (massimo ${NAME_MAX} caratteri).`); return; }
+    if (name === c.name) return;
+    const listOf = d => tab === 'fav' ? d.fav.items : d.items;
+    if (nameTaken(db, name, c.id, listOf(db))) { status(`Esiste già una posizione chiamata «${name}».`); return; }
+    const r = commit(d => { listOf(d).find(i => i.id === c.id).name = name; });
+    render(); status(r === 'ok' ? `Rinominata in «${name}».` : 'Rinomina non riuscita: memoria non accessibile.');
   });
-  window.addEventListener('storage', event => { if (event.key === KEY || event.key === null) { read(); render(); status(storageError || 'Posizione aggiornata.'); } });
+
+  // ---------- Cancellazione e ripristino ----------
+  function removeItems(ids, text) {
+    const removed = db.items.filter(i => ids.has(i.id));
+    if (!removed.length || busy) return;
+    const r = commit(d => {
+      d.items = d.items.filter(i => !ids.has(i.id)); d.undo = removed;
+      if (!d.items.some(i => i.id === d.sel)) d.sel = d.items.length ? d.items[d.items.length - 1].id : null;
+    });
+    if (r !== 'ok') { render(); status('Cancellazione non riuscita: memoria non accessibile.'); return; }
+    checked.clear(); render();
+    status(`${text} Se è stato un errore, tocca «Ripristina».`);
+  }
+  el('cancella').addEventListener('click', () => { const c = cur(); if (!c) return; if (tab === 'fav') removeFav(c); else removeItems(new Set([c.id]), `«${c.name}» cancellata.`); });
+  el('gestisci').addEventListener('click', () => { if (db.items.length && !busy) { editing = true; checked.clear(); render(); status('Spunta le posizioni da cancellare.'); } });
+  el('fine').addEventListener('click', () => { editing = false; checked.clear(); render(); status(''); });
+  el('tutte').addEventListener('click', () => {
+    if (checked.size === db.items.length) checked.clear(); else db.items.forEach(i => checked.add(i.id));
+    render();
+  });
+  el('cancSel').addEventListener('click', () => {
+    if (!checked.size) return;
+    if (checked.size > 1 && !window.confirm(`Cancellare ${checked.size} posizioni?`)) return;
+    const n = checked.size; editing = false;
+    removeItems(new Set(checked), n === 1 ? 'Posizione cancellata.' : `${n} posizioni cancellate.`);
+  });
+  el('cancTutte').addEventListener('click', () => {
+    if (!db.items.length || !window.confirm(`Cancellare tutte le ${db.items.length} posizioni?`)) return;
+    const n = db.items.length; editing = false;
+    removeItems(new Set(db.items.map(i => i.id)), `Tutte le ${n} posizioni cancellate.`);
+  });
+  el('ripristina').addEventListener('click', () => {
+    if (tab === 'fav') { restoreFav(); return; }
+    if (!db.undo.length || busy) return;
+    let back = 0, left = 0;
+    const r = commit(d => {
+      const pending = d.undo; d.undo = [];
+      for (const it of pending) {
+        if (d.items.length >= MAX) { d.undo.push(it); continue; }
+        if (nameTaken(d, it.name)) it.name = /^[PR]\d+$/i.test(it.name) ? freeName(d, prefixOf(it)) : it.name.slice(0, NAME_MAX - 6) + ' (rip.)';
+        if (nameTaken(d, it.name)) it.name = freeName(d, prefixOf(it));
+        d.items.push(it); d.sel = it.id; back++;
+      }
+      d.items.sort((a, b) => a.savedAt - b.savedAt); left = d.undo.length;
+    });
+    render();
+    status(r !== 'ok' ? 'Ripristino non riuscito: memoria non accessibile.'
+      : left ? `Ripristinate ${back}; ${left} non ripristinate perché l’elenco è pieno (${MAX}).` : back === 1 ? 'Posizione ripristinata.' : `${back} posizioni ripristinate.`);
+  });
+  // ---------- Backup su file GPX ----------
+  const BKINFO = 'parcheggiBackup';
+  function readBackupInfo() {
+    try { const b = JSON.parse(localStorage.getItem(BKINFO)); return b && Number.isFinite(b.at) && Number.isFinite(b.rev) ? b : null; } catch { return null; }
+  }
+  const esc = t => String(t).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'})[c]);
+  function toGpx() {
+    const wpt = (i, desc, ext, type) => `  <wpt lat="${i.lat}" lon="${i.lon}">\n    <time>${new Date(Number.isFinite(i.savedAt) ? i.savedAt : Date.now()).toISOString()}</time>\n    <name>${esc(i.name)}</name>\n${type ? `    <type>${esc(type)}</type>\n` : ''}    <desc>${esc(desc + (accText(i) ? ', precisione ' + accText(i) : ''))}</desc>\n    <extensions>${Number.isFinite(i.accuracy) ? `<precisione>${i.accuracy}</precisione>` : ''}${ext}</extensions>\n  </wpt>`;
+    const park = db.items.map(i => wpt(i, isRapido(i) ? 'Parcheggio Rapido' : 'Parcheggio', isRapido(i) ? '<sorgente>rapido</sorgente>' : '', ''));
+    const fav = db.fav.items.map(i => wpt(i, 'Preferito', '<preferito>1</preferito>', folderName(i.folder)));
+    const meta = db.fav.folders.length ? `  <metadata>\n    <extensions>${db.fav.folders.map(f => `<cartella>${esc(f.name)}</cartella>`).join('')}</extensions>\n  </metadata>\n` : '';
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Parcheggio Facile by Lollo ®2026" xmlns="http://www.topografix.com/GPX/1/1">\n${meta}${[...park, ...fav].join('\n')}\n</gpx>\n`;
+  }
+  const backupName = () => `parcheggio-facile-backup-${new Date().toISOString().slice(0, 10)}.gpx`;
+  function markBackup() { try { localStorage.setItem(BKINFO, JSON.stringify({at: Date.now(), rev: db.rev || 0})); } catch {} render(); }
+  el('scarica').addEventListener('click', () => {
+    if (!hasData()) return;
+    const url = URL.createObjectURL(new Blob([toGpx()], {type: 'application/gpx+xml'}));
+    const a = document.createElement('a'); a.href = url; a.download = backupName(); document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    markBackup(); status('Backup scaricato (cartella Download). Per metterlo anche su Drive usa «Invia a Drive».');
+  });
+  el('invia').addEventListener('click', async () => {
+    if (!hasData()) return;
+    const file = new File([toGpx()], backupName(), {type: 'application/gpx+xml'});
+    try {
+      if (navigator.canShare && navigator.canShare({files: [file]})) {
+        await navigator.share({files: [file], title: 'Backup Parcheggio Facile'});
+        markBackup(); status('Backup inviato.'); return;
+      }
+    } catch (error) { if (error.name === 'AbortError') { status('Invio annullato.'); return; } }
+    el('scarica').click();
+    status('Questo browser non può inviare file direttamente: ho scaricato il backup. Aprilo da «File» e condividilo su Drive.');
+  });
+  function parseGpx(text) {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('xml');
+    const txt = (node, tag) => { const n = node.getElementsByTagName(tag)[0]; return n ? n.textContent : ''; };
+    const clean1 = t => t.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
+    const park = [], fav = [], folders = [];
+    for (const n of doc.getElementsByTagName('cartella')) { const f = clean1(n.textContent); if (f) folders.push(f); }
+    for (const w of doc.getElementsByTagName('wpt')) {
+      const ac = parseFloat(txt(w, 'precisione')), tm = Date.parse(txt(w, 'time'));
+      const it = {lat: parseFloat(w.getAttribute('lat')), lon: parseFloat(w.getAttribute('lon')),
+        name: clean1(txt(w, 'name')),
+        accuracy: Number.isFinite(ac) && ac >= 0 ? ac : null, savedAt: Number.isFinite(tm) ? tm : Date.now()};
+      if (!valid(it)) continue;
+      if (txt(w, 'preferito').trim() === '1') { it.folderName = clean1(txt(w, 'type')) || 'Preferiti'; fav.push(it); continue; }
+      if (txt(w, 'sorgente').trim() === 'rapido') it.src = 'rapido';
+      park.push(it);
+    }
+    return {park, fav, folders};
+  }
+  function uniqueName(d, name, prefix, list) {
+    if (!name) return freeName(d, prefix, list);
+    if (!nameTaken(d, name, null, list)) return name;
+    for (let k = 2; k < 100; k++) { const n = name.slice(0, NAME_MAX - 5) + ` (${k})`; if (!nameTaken(d, n, null, list)) return n; }
+    return freeName(d, prefix, list);
+  }
+  el('importa').addEventListener('click', () => { if (!busy) { el('file').value = ''; el('file').click(); } });
+  el('file').addEventListener('change', async () => {
+    const f = el('file').files[0]; if (!f) return;
+    let data;
+    try { if (f.size > 1e6) throw new Error('big'); data = parseGpx(await f.text()); }
+    catch { status('File non valido: scegli un backup GPX di Parcheggio Facile.'); return; }
+    if (!data.park.length && !data.fav.length && !data.folders.length) { status('Nel file non ci sono posizioni.'); return; }
+    let added = 0, addedFav = 0, dup = 0, full = 0;
+    const r = commit(d => {
+      added = addedFav = dup = full = 0;
+      for (const it of data.park) {
+        if (d.items.some(x => Math.abs(x.lat - it.lat) < 1e-6 && Math.abs(x.lon - it.lon) < 1e-6)) { dup++; continue; }
+        if (d.items.length >= MAX) { full++; continue; }
+        it.id = uid(); it.name = uniqueName(d, it.name, prefixOf(it)); d.items.push(it); d.sel = it.id; added++;
+      }
+      d.items.sort((a, b) => a.savedAt - b.savedAt);
+      const folderId = name => { try { return ensureFolder(d, {newName: name}); } catch { return null; } };
+      for (const name of data.folders) folderId(name);
+      for (const it of data.fav) {
+        const fid = folderId(it.folderName);
+        if (!fid) { full++; continue; }
+        if (d.fav.items.some(x => x.folder === fid && Math.abs(x.lat - it.lat) < 1e-6 && Math.abs(x.lon - it.lon) < 1e-6)) { dup++; continue; }
+        if (d.fav.items.length >= MAXFAV) { full++; continue; }
+        const item = {id: uid(), folder: fid, name: uniqueName(d, it.name, 'F', d.fav.items), lat: it.lat, lon: it.lon, accuracy: it.accuracy, savedAt: it.savedAt};
+        d.fav.items.push(item); d.fav.sel = item.id; addedFav++;
+      }
+    });
+    render();
+    if (r !== 'ok') { status('Importazione non riuscita: memoria non accessibile.'); return; }
+    status(`Importate ${added} posizioni e ${addedFav} preferiti.` + (dup ? ` ${dup} già presenti.` : '') + (full ? ` ${full} non importati: elenco pieno o limite raggiunto.` : ''));
+  });
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}   // chiede al browser di non cancellare i dati da solo
+  // ---------- Punti salvati da «Parcheggio Rapido» (rapido.html, stessa cartella = stessa memoria) ----------
+  const RKEY = 'parcheggioRapido', SETTLE_MS = 90000;
+  let rapidoTimer = null;
+  function readRapido() {
+    try { const a = JSON.parse(localStorage.getItem(RKEY)); return Array.isArray(a) ? a.filter(r => valid(r) && typeof r.id === 'string') : []; } catch { return []; }
+  }
+  function importRapido() {
+    clearTimeout(rapidoTimer);
+    if (busy) return;
+    const now = Date.now(), all = readRapido();
+    // un punto è "pronto" se Rapido ha finito di migliorarlo (fin) o non lo aggiorna da un po'
+    const ready = all.filter(r => r.fin || now - (r.upd || r.savedAt || 0) > SETTLE_MS);
+    const waiting = all.filter(r => !ready.includes(r));
+    if (waiting.length) rapidoTimer = setTimeout(importRapido, SETTLE_MS + 500);
+    if (!ready.length) return;
+    const known = new Set(db.items.map(i => i.id));
+    const todo = ready.filter(r => !known.has('r' + r.id)).sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+    let added = [];
+    const left = new Set();
+    const res = commit(d => {
+      added = []; left.clear();
+      for (const x of todo) {
+        if (d.items.length >= MAX) { left.add(x.id); continue; }
+        const it = {id: 'r' + x.id, src: 'rapido', name: freeName(d, 'R'), lat: x.lat, lon: x.lon, accuracy: Number.isFinite(x.accuracy) ? x.accuracy : null, savedAt: Number.isFinite(x.savedAt) ? x.savedAt : now};
+        d.items.push(it); d.sel = it.id; added.push(it);
+      }
+    });
+    if (res !== 'ok') return;
+    try { localStorage.setItem(RKEY, JSON.stringify([...waiting, ...ready.filter(r => left.has(r.id))])); } catch {}   // se fallisce, l'id evita doppioni
+    render();
+    if (added.length) status(`Importato da Parcheggio Rapido: ${added.map(i => `${i.name}${accText(i) ? ' (' + accText(i) + ')' : ''}`).join(', ')}.` + (left.size ? ` ${left.size} in attesa: elenco pieno (${MAX}).` : ''));
+    else if (left.size) status(`${left.size} punti di Parcheggio Rapido in attesa: elenco pieno (${MAX}), cancellane qualcuno.`);
+  }
+  window.addEventListener('storage', event => {
+    if (event.key === SKEY || event.key === null) { load(); render(); status(storageError || 'Posizioni aggiornate.'); }
+    if (event.key === RKEY || event.key === null) importRapido();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') importRapido(); });
+  window.addEventListener('focus', importRapido);
+  const web = ['https:','http:'].includes(location.protocol);
   let installPrompt = null;
-  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; el('installa').hidden = false; });
+  const installed = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (installed()) el('installa').hidden = true;
+  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; });
   el('installa').addEventListener('click', async () => {
-    if (!installPrompt) return;
-    const prompt = installPrompt; installPrompt = null; el('installa').hidden = true;
-    try { await prompt.prompt(); const choice = await prompt.userChoice; el('installInfo').textContent = choice.outcome === 'accepted' ? 'Installazione richiesta.' : 'Installazione annullata.'; }
-    catch { el('installInfo').textContent = 'Apri il menu del browser e scegli Aggiungi alla schermata Home.'; }
+    if (installPrompt) {
+      const prompt = installPrompt; installPrompt = null;
+      try { await prompt.prompt(); const choice = await prompt.userChoice; el('installInfo').textContent = choice.outcome === 'accepted' ? 'Installazione richiesta.' : 'Installazione annullata.'; }
+      catch { el('installInfo').textContent = 'Apri il menu del browser (⋮) e scegli «Installa app» o «Aggiungi alla schermata Home».'; }
+      return;
+    }
+    el('installInfo').textContent = !web || !window.isSecureContext ? 'Per installare pubblica l’app su un indirizzo HTTPS e aprila da lì.'
+      : /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'Su iPhone/iPad: tocca Condividi (quadrato con freccia), poi «Aggiungi alla schermata Home».'
+      : 'Apri il menu del browser (⋮) e scegli «Installa app» o «Aggiungi alla schermata Home».';
   });
   window.addEventListener('appinstalled', () => { installPrompt = null; el('installa').hidden = true; el('installInfo').textContent = 'App installata.'; });
-  const web = ['https:','http:'].includes(location.protocol);
+  // ---------- Tema chiaro/scuro (segue il telefono; il pulsante 🌙/☀️ forza una scelta) ----------
+  const darkMq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : !!(darkMq && darkMq.matches); };
+  function themeUi() {
+    el('tema').textContent = isDark() ? '☀️' : '🌙';
+    const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = isDark() ? '#1a2129' : '#2196f3';
+  }
+  el('tema').addEventListener('click', () => {
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('parcheggiTema', next); } catch {}
+    themeUi();
+  });
+  if (darkMq && darkMq.addEventListener) darkMq.addEventListener('change', themeUi);
+  themeUi();
+  
   if (web && window.isSecureContext && 'serviceWorker' in navigator) {
     el('installInfo').textContent = 'Per installare: menu del browser → Aggiungi alla schermata Home.';
     navigator.serviceWorker.register('./sw.js').then(() => navigator.serviceWorker.ready).then(() => {
@@ -177,7 +841,8 @@
   } else {
     el('installInfo').textContent = 'File locale: per un’icona Home stabile e la modalità offline occorre pubblicare il pacchetto completo su HTTPS.';
   }
-  read(); render(); status(storageError || (pos ? 'Posizione memorizzata.' : ''));
+  load(); render(); status(storageError || (db.items.length ? 'Posizioni memorizzate.' : ''));
+  importRapido();
 })();
 </script>
 </body>
